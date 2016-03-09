@@ -1,0 +1,32 @@
+[Wed Mar  9 22:50:51 2016] INFO: Opened log file Urho3D.log
+[Wed Mar  9 22:50:51 2016] INFO: Created 3 worker threads
+[Wed Mar  9 22:50:51 2016] INFO: Added resource path /home/zjf/github/myUrho3DProj/build_generic/bin/Data/
+[Wed Mar  9 22:50:51 2016] INFO: Added resource path /home/zjf/github/myUrho3DProj/build_generic/bin/CoreData/
+[Wed Mar  9 22:50:51 2016] INFO: Set screen mode 1024x768 windowed
+[Wed Mar  9 22:50:51 2016] INFO: Initialized input
+[Wed Mar  9 22:50:51 2016] INFO: Initialized user interface
+[Wed Mar  9 22:50:51 2016] INFO: Initialized renderer
+[Wed Mar  9 22:50:51 2016] INFO: Initialized engine
+
+Used resources:
+Textures/Ramp.png
+Textures/Spot.png
+Textures/StoneDiffuse.dds
+Textures/StoneNormal.dds
+Textures/Mushroom.dds
+Textures/Smoke.dds
+Textures/RampExtreme.png
+Techniques/NoTexture.xml
+Techniques/DiffNormalPacked.xml
+Techniques/Diff.xml
+Techniques/DiffLitParticleAlpha.xml
+RenderPaths/Forward.xml
+Models/Box.mdl
+Models/Mushroom.mdl
+Materials/Stone.xml
+Materials/Mushroom.xml
+Materials/LitSmoke.xml
+Shaders/GLSL/LitSolid.glsl
+Shaders/GLSL/LitParticle.glsl
+Shaders/GLSL/Stencil.glsl
+Shaders/GLSL/Shadow.glsl
