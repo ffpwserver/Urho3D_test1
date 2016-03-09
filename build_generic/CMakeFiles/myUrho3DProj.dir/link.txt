@@ -1,1 +1,0 @@
-/usr/bin/c++    -Wno-invalid-offsetof -march=native -ffast-math -pthread -fdiagnostics-color=auto -O3 -DNDEBUG    CMakeFiles/myUrho3DProj.dir/HelloWorld.cpp.o  -o bin/myUrho3DProj -rdynamic /home/zjf/github/Urho3D/build_generic/lib/libUrho3D.a -ldl -lrt -lGL -ldl -lrt -lGL 
