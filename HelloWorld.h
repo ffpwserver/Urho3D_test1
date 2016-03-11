@@ -66,6 +66,7 @@ private:
 private:
 	SharedPtr<Scene> scene_;
     SharedPtr<Node> cameraNode_;
+    SharedPtr<Node> rearCameraNode_;
     float yaw_;
     float pitch_;
     float roll_;

@@ -38,6 +38,7 @@
 #include <Urho3D/Graphics/Zone.h>
 #include <Urho3D/Graphics/Light.h>
 #include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Graphics/RenderPath.h>
 #include <Urho3D/Graphics/DebugRenderer.h>
 #include <Urho3D/Graphics/Model.h>
 #include <Urho3D/Graphics/StaticModel.h>
@@ -176,6 +177,12 @@ void HelloWorld::CreateCamera()
     Camera* camera = cameraNode_->CreateComponent<Camera>();
     camera->SetFarClip(300.0f);
 
+    rearCameraNode_ = cameraNode_->CreateChild("RearCamera");
+    rearCameraNode_->SetRotation(Quaternion(180.0f, Vector3::UP));
+    Camera* rearCamera = rearCameraNode_->CreateComponent<Camera>();
+    rearCamera->SetFarClip(200.0f);
+    rearCamera->SetViewOverrideFlags(VO_LOW_MATERIAL_QUALITY | VO_DISABLE_OCCLUSION | VO_DISABLE_OCCLUSION);
+
     cameraNode_->SetPosition(Vector3(0.0f, 40.0f, 0.0f));
     pitch_ = 90.0f;
 
@@ -279,9 +286,41 @@ void HelloWorld::CreateText()
 void HelloWorld::SetupViewport()
 {
     Renderer* renderer = GetSubsystem<Renderer>();
+    Graphics* graphics = GetSubsystem<Graphics>();
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    // setup two viewports
+    renderer->SetNumViewports(2);
 
     SharedPtr<Viewport> viewport(new Viewport(context_, scene_, cameraNode_->GetComponent<Camera>()));
     renderer->SetViewport(0, viewport);
+
+    ///
+
+    SharedPtr<RenderPath> effectRenderPath = viewport->GetRenderPath()->Clone();
+    effectRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/Bloom.xml"));
+    effectRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/FXAA2.xml"));
+    effectRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/Blur.xml"));
+    effectRenderPath->SetShaderParameter("BloomMix", Vector2(0.9f, 0.6f));
+    effectRenderPath->SetEnabled("Bloom", false);
+    effectRenderPath->SetEnabled("FXAA2", false);
+    effectRenderPath->SetEnabled("Blur", false);
+    viewport->SetRenderPath(effectRenderPath);
+
+    //
+    int left = graphics->GetWidth() * 2 / 3;
+    int bottom = graphics->GetHeight() / 3;
+    int right = graphics->GetWidth() - 32;
+    int top = 32;
+    SharedPtr<Viewport> rearViewport(
+        new Viewport(
+            context_, 
+            scene_, 
+            rearCameraNode_->GetComponent<Camera>(), 
+            IntRect(left, top, right, bottom)
+            )
+        );
+    renderer->SetViewport(1, rearViewport);
 }
 
 void HelloWorld::HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -310,6 +349,7 @@ void HelloWorld::MoveCamera(float timeDelta)
         return;
 
     Input* input = GetSubsystem<Input>();
+    RenderPath* effectRenderPath = GetSubsystem<Renderer>()->GetViewport(0)->GetRenderPath();
 
     IntVector2 mouseMovement = input->GetMouseMove();
 
@@ -341,6 +381,12 @@ void HelloWorld::MoveCamera(float timeDelta)
         cameraNode_->Translate(Vector3::RIGHT * MOVE_SPEED * timeDelta);
     if (input->GetKeyPress(KEY_SPACE))
         drawDebug_ = !drawDebug_;
+    if (input->GetKeyPress('I'))
+        effectRenderPath->ToggleEnabled("Bloom");
+    if (input->GetKeyPress('O'))
+        effectRenderPath->ToggleEnabled("FXAA2");
+    if (input->GetKeyPress('P'))
+        effectRenderPath->ToggleEnabled("Blur");
     if (input->GetKeyPress(KEY_ESC))
         engine_->Exit();
 }
@@ -349,7 +395,7 @@ void HelloWorld::ToggleLight()
 {
     Input* input = GetSubsystem<Input>();
 
-    if (input->GetKeyPress('F'))
+    if (input->GetMouseButtonPress(MOUSEB_RIGHT))
     {
         Light* light = cameraNode_->GetComponent<Light>();
         light->SetEnabled(!light->IsEnabled());
