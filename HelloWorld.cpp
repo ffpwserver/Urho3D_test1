@@ -40,9 +40,12 @@
 #include <Urho3D/Graphics/Renderer.h>
 #include <Urho3D/Graphics/RenderPath.h>
 #include <Urho3D/Graphics/DebugRenderer.h>
+#include <Urho3D/Graphics/RenderSurface.h>
 #include <Urho3D/Graphics/Model.h>
+#include <Urho3D/Graphics/Skybox.h>
 #include <Urho3D/Graphics/StaticModel.h>
 #include <Urho3D/Graphics/BillboardSet.h>
+#include <Urho3D/Graphics/Technique.h>
 #include <Urho3D/Graphics/Texture2D.h>
 // #include <Urho3D/Scene/SceneEvents.h>
 // #include <Urho3D/UI/Sprite.h>
@@ -54,9 +57,10 @@
 #include <Urho3D/UI/Font.h>
 #include <Urho3D/UI/Text.h>
 
+#include <Urho3D/DebugNew.h>
 
 #include "HelloWorld.h"
-
+#include "Rotator.h"
 
 // Expands to this example's entry-point
 URHO3D_DEFINE_APPLICATION_MAIN(HelloWorld)
@@ -68,6 +72,7 @@ HelloWorld::HelloWorld(Context* context)
 , roll_(0.0f)
 , drawDebug_(false)
 {
+    context->RegisterFactory<Rotator>();
 }
 
 void HelloWorld::Setup()
@@ -92,39 +97,7 @@ void HelloWorld::Start()
 
     CreateScene();
 
-    SetupViewport();
-
-    SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(HelloWorld, HandleUpdate));
-
-    SubscribeToEvent(E_POSTRENDERUPDATE, URHO3D_HANDLER(HelloWorld, HandlePostRenderUpdate));
-    // CreateText();
-}
-
-void HelloWorld::Stop()
-{
-    engine_->DumpResources(true);
-}
-
-void HelloWorld::CreateScene()
-{
-    // create a scene
-    scene_ = new Scene(context_);
-
-    // create octree and debug renderer for scene
-    scene_->CreateComponent<Octree>();
-    scene_->CreateComponent<DebugRenderer>();
-
-    Node* zoneNode = scene_->CreateChild("Zone");
-    Zone* zone = zoneNode->CreateComponent<Zone>();
-    zone->SetBoundingBox(BoundingBox(-80.0f, 80.0f));
-    zone->SetAmbientColor(Color(0.1f, 0.1f, 0.1f));
-
-    Node* lightNode = scene_->CreateChild("DirectionalLight");
-    lightNode->SetDirection(Vector3(0.5f, -1.0f, 0.5f));
-    Light* light = lightNode->CreateComponent<Light>();
-    light->SetLightType(LIGHT_DIRECTIONAL);
-    light->SetColor(Color(1.0f, 1.0f, 1.0f));
-    light->SetSpecularIntensity(1.4f);
+    CreateSkybox();
 
     CreateFloor();
 
@@ -135,6 +108,113 @@ void HelloWorld::CreateScene()
     CreateLights();
 
     CreateCamera();
+
+    SetupViewport();
+
+    SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(HelloWorld, HandleUpdate));
+
+    SubscribeToEvent(E_POSTRENDERUPDATE, URHO3D_HANDLER(HelloWorld, HandlePostRenderUpdate));
+}
+
+void HelloWorld::Stop()
+{
+    engine_->DumpResources(true);
+}
+
+void HelloWorld::CreateScene()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+    {
+        // create scene for render to texture
+        rttScene_ = new Scene(context_);
+
+        rttScene_->CreateComponent<Octree>();
+
+        Node* zoneNode = rttScene_->CreateChild("Zone");
+        Zone* zone = zoneNode->CreateComponent<Zone>();
+        zone->SetBoundingBox(BoundingBox(-1000.0f, 1000.0f));
+        zone->SetAmbientColor(Color(0.05f, 0.1f, 0.15f));
+        zone->SetFogColor(Color(0.1f, 0.2f, 0.3f));
+        zone->SetFogStart(10.0f);
+        zone->SetFogEnd(100.0f);
+
+        const unsigned NUM_OBJECTS = 2000;
+        for (unsigned i = 0; i < NUM_OBJECTS; ++i)
+        {
+            Node* boxNode = rttScene_->CreateChild("Box");
+            boxNode->SetPosition(Vector3(Random(200.0f) - 100.0f, Random(200.0f) - 100.0f, Random(200.0f) - 100.0f));
+            boxNode->SetRotation(Quaternion(Random(360.0f), Random(360.0f), Random(360.0f)));
+            StaticModel* box = boxNode->CreateComponent<StaticModel>();
+            box->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+            box->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+
+            Rotator* rotator = boxNode->CreateComponent<Rotator>();
+            rotator->SetRotationSpeed(Vector3(Random(20.0f), Random(20.0f), Random(20.0f)));
+        }
+
+        rttCameraNode_ = rttScene_->CreateChild("Camera");
+        Camera* camera = rttCameraNode_->CreateComponent<Camera>();
+        camera->SetFarClip(100.0f);
+
+        Light* light = rttCameraNode_->CreateComponent<Light>();
+        light->SetLightType(LIGHT_POINT);
+        light->SetRange(30.0f);
+    }
+
+    {
+        // create main scene
+        scene_ = new Scene(context_);
+
+        // create octree and debug renderer for scene
+        scene_->CreateComponent<Octree>();
+        scene_->CreateComponent<DebugRenderer>();
+
+        Node* zoneNode = scene_->CreateChild("Zone");
+        Zone* zone = zoneNode->CreateComponent<Zone>();
+        zone->SetBoundingBox(BoundingBox(-1000.0f, 1000.0f));
+        zone->SetAmbientColor(Color(0.1f, 0.1f, 0.1f));
+
+        Node* lightNode = scene_->CreateChild("DirectionalLight");
+        lightNode->SetDirection(Vector3(0.5f, -1.0f, 0.5f));
+        Light* light = lightNode->CreateComponent<Light>();
+        light->SetLightType(LIGHT_DIRECTIONAL);
+        light->SetColor(Color(1.0f, 1.0f, 1.0f));
+        light->SetSpecularIntensity(1.0f);
+
+        {
+            // screen's "stone" background
+            Node* boxNode = scene_->CreateChild("ScreenBox");
+            boxNode->SetPosition(Vector3(0.0f, 10.0f, 0.0f));
+            boxNode->SetScale(Vector3(21.0f, 16.0f, 0.5f));
+            StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
+            boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+            boxObject->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+
+            // plane for render
+            Node* screenNode = scene_->CreateChild("Screen");
+            screenNode->SetPosition(Vector3(0.0f, 10.0f, -0.27f));
+            screenNode->SetRotation(Quaternion(-90.0f, 0.0f, 0.0f));
+            screenNode->SetScale(Vector3(20.0f, 0.0f, 15.0f));
+            StaticModel* screenObject = screenNode->CreateComponent<StaticModel>();
+            screenObject->SetModel(cache->GetResource<Model>("Models/Plane.mdl"));
+
+            // real render texture for object
+            SharedPtr<Texture2D> renderTexture(new Texture2D(context_));
+            renderTexture->SetSize(1024, 768, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+            renderTexture->SetFilterMode(FILTER_BILINEAR);
+
+            // make material from texture && bind this material to screenObj
+            SharedPtr<Material> renderMaterial(new Material(context_));
+            renderMaterial->SetTechnique(0, cache->GetResource<Technique>("Techniques/DiffUnlit.xml"));
+            renderMaterial->SetTexture(TU_DIFFUSE, renderTexture);
+            screenObject->SetMaterial(renderMaterial);
+
+            // 
+            RenderSurface* renderSurface = renderTexture->GetRenderSurface();
+            SharedPtr<Viewport> rttViewport(new Viewport(context_, rttScene_, rttCameraNode_->GetComponent<Camera>()));
+            renderSurface->SetViewport(0, rttViewport);
+        }
+    }
 }
 
 void HelloWorld::CreateFloor()
@@ -183,8 +263,7 @@ void HelloWorld::CreateCamera()
     rearCamera->SetFarClip(200.0f);
     rearCamera->SetViewOverrideFlags(VO_LOW_MATERIAL_QUALITY | VO_DISABLE_OCCLUSION | VO_DISABLE_OCCLUSION);
 
-    cameraNode_->SetPosition(Vector3(0.0f, 40.0f, 0.0f));
-    pitch_ = 90.0f;
+    cameraNode_->SetPosition(Vector3(0.0f, 5.0f, -20.0f));
 
     // try to create a spot light to camera node
     Light* light = cameraNode_->CreateComponent<Light>();
@@ -259,6 +338,16 @@ void HelloWorld::CreateLights()
     light->SetShadowDistance(125.0f);
     light->SetShadowResolution(0.5f);
     light->SetShadowNearFarRatio(0.01f);
+}
+
+void HelloWorld::CreateSkybox()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    Node* skyNode = scene_->CreateChild("Sky");
+    Skybox* skybox = skyNode->CreateComponent<Skybox>();
+    skybox->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    skybox->SetMaterial(cache->GetResource<Material>("Materials/Skybox.xml"));
 }
 
 void HelloWorld::CreateText()

@@ -56,6 +56,7 @@ private:
     void CreateCamera();
     void CreateBillboards();
     void CreateLights();
+    void CreateSkybox();
     void SetupViewport();
     void MoveCamera(float timeDelta);
     void AnimateScene(float timeDelta);
@@ -64,9 +65,12 @@ private:
     void HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData);
 
 private:
-	SharedPtr<Scene> scene_;
+    SharedPtr<Scene> scene_;
     SharedPtr<Node> cameraNode_;
     SharedPtr<Node> rearCameraNode_;
+    
+    SharedPtr<Scene> rttScene_;
+    SharedPtr<Node> rttCameraNode_;
     float yaw_;
     float pitch_;
     float roll_;
