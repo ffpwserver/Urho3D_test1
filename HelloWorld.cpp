@@ -32,6 +32,10 @@
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
 
+#include <Urho3D/Physics/CollisionShape.h>
+#include <Urho3D/Physics/PhysicsWorld.h>
+#include <Urho3D/Physics/RigidBody.h>
+
 #include <Urho3D/Graphics/Graphics.h>
 #include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Graphics/Octree.h>
@@ -101,6 +105,10 @@ void HelloWorld::Start()
 
     CreateFloor();
 
+    CreateFloor2();
+
+    CreatePyramid();
+
     CreateStaticModel();
 
     CreateBillboards();
@@ -168,6 +176,7 @@ void HelloWorld::CreateScene()
         // create octree and debug renderer for scene
         scene_->CreateComponent<Octree>();
         scene_->CreateComponent<DebugRenderer>();
+        scene_->CreateComponent<PhysicsWorld>();
 
         Node* zoneNode = scene_->CreateChild("Zone");
         Zone* zone = zoneNode->CreateComponent<Zone>();
@@ -221,9 +230,9 @@ void HelloWorld::CreateFloor()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    for (int i = -3; i <= 3; ++i)
+    for (int i = -10; i <= 10; ++i)
     {
-        for (int j = -3; j <= 3; ++j)
+        for (int j = -10; j <= 10; ++j)
         {
             Node* floorNode = scene_->CreateChild("FloorTile");
             floorNode->SetPosition(Vector3(j * 10.2f, -0.5f, i * 10.2f));
@@ -231,6 +240,46 @@ void HelloWorld::CreateFloor()
             StaticModel* floorObj = floorNode->CreateComponent<StaticModel>();
             floorObj->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
             floorObj->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+        }
+    }
+}
+
+void HelloWorld::CreateFloor2()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    Node* floorNode = scene_->CreateChild("Floor2");
+    floorNode->SetPosition(Vector3(0.0f, 40.0f, 0.0f));
+    floorNode->SetScale(Vector3(1000.0f, 1.0f, 1000.0f));
+    StaticModel* floorObject = floorNode->CreateComponent<StaticModel>();
+    floorObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    floorObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
+
+    RigidBody* body = floorNode->CreateComponent<RigidBody>();
+    CollisionShape* shape = floorNode->CreateComponent<CollisionShape>();
+    shape->SetBox(Vector3::ONE);
+}
+
+void HelloWorld::CreatePyramid()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    for (int y = 0; y < 8; ++y)
+    {
+        for (int x = -y; x <= y; ++x)
+        {
+            Node* boxNode = scene_->CreateChild("Box");
+            boxNode->SetPosition(Vector3((float)x, -(float)y + 48.0f, 0.0f));
+            StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
+            boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+            boxObject->SetMaterial(cache->GetResource<Material>("Materials/StoneEnvMapSmall.xml"));
+            boxObject->SetCastShadows(true);
+
+            RigidBody* body = boxNode->CreateComponent<RigidBody>();
+            body->SetMass(1.0f);
+            body->SetFriction(0.2f);
+            CollisionShape* shape = boxNode->CreateComponent<CollisionShape>();
+            shape->SetBox(Vector3::ONE);
         }
     }
 }
