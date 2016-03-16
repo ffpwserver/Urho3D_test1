@@ -264,12 +264,12 @@ void HelloWorld::CreatePyramid()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    for (int y = 0; y < 8; ++y)
+    for (int y = 0; y < 20; ++y)
     {
         for (int x = -y; x <= y; ++x)
         {
             Node* boxNode = scene_->CreateChild("Box");
-            boxNode->SetPosition(Vector3((float)x, -(float)y + 48.0f, 0.0f));
+            boxNode->SetPosition(Vector3((float)x, -(float)y + 20.0f + 40.0f, 0.0f));
             StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
             boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
             boxObject->SetMaterial(cache->GetResource<Material>("Materials/StoneEnvMapSmall.xml"));
@@ -278,6 +278,7 @@ void HelloWorld::CreatePyramid()
             RigidBody* body = boxNode->CreateComponent<RigidBody>();
             body->SetMass(1.0f);
             body->SetFriction(0.2f);
+            // body->SetCollisionEventMode(COLLISION_NEVER);
             CollisionShape* shape = boxNode->CreateComponent<CollisionShape>();
             shape->SetBox(Vector3::ONE);
         }
@@ -302,17 +303,19 @@ void HelloWorld::CreateCamera()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    cameraNode_ = scene_->CreateChild("Camera");
+    // cameraNode_ = scene_->CreateChild("Camera");
+    // create the camera node outside the scene because......
+    cameraNode_ = new Node(context_);
+    cameraNode_->SetPosition(Vector3(0.0f, 5.0f, -20.0f));
     Camera* camera = cameraNode_->CreateComponent<Camera>();
-    camera->SetFarClip(300.0f);
+    camera->SetFarClip(1000.0f);
 
     rearCameraNode_ = cameraNode_->CreateChild("RearCamera");
     rearCameraNode_->SetRotation(Quaternion(180.0f, Vector3::UP));
     Camera* rearCamera = rearCameraNode_->CreateComponent<Camera>();
     rearCamera->SetFarClip(200.0f);
     rearCamera->SetViewOverrideFlags(VO_LOW_MATERIAL_QUALITY | VO_DISABLE_OCCLUSION | VO_DISABLE_OCCLUSION);
-
-    cameraNode_->SetPosition(Vector3(0.0f, 5.0f, -20.0f));
+    
 
     // try to create a spot light to camera node
     Light* light = cameraNode_->CreateComponent<Light>();
@@ -458,6 +461,7 @@ void HelloWorld::SetupViewport()
             IntRect(left, top, right, bottom)
             )
         );
+    rearViewport->SetDrawDebug(false);
     renderer->SetViewport(1, rearViewport);
 }
 
@@ -477,7 +481,7 @@ void HelloWorld::HandleUpdate(StringHash eventType, VariantMap& eventData)
 void HelloWorld::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
 {
     if (drawDebug_)
-        GetSubsystem<Renderer>()->DrawDebugGeometry(true);
+        scene_->GetComponent<PhysicsWorld>()->DrawDebugGeometry(true);
 }
 
 void HelloWorld::MoveCamera(float timeDelta)
@@ -509,14 +513,19 @@ void HelloWorld::MoveCamera(float timeDelta)
 
     cameraNode_->SetRotation(Quaternion(pitch_, yaw_, roll_));
 
+    float moveSpeed;
+    if (input->GetKeyDown(KEY_SHIFT))
+        moveSpeed = MOVE_SPEED * 10.0f;
+    else
+        moveSpeed = MOVE_SPEED;
     if (input->GetKeyDown('W'))
-        cameraNode_->Translate(Vector3::FORWARD * MOVE_SPEED * timeDelta);
+        cameraNode_->Translate(Vector3::FORWARD * moveSpeed * timeDelta);
     if (input->GetKeyDown('S'))
-        cameraNode_->Translate(Vector3::BACK * MOVE_SPEED * timeDelta);
+        cameraNode_->Translate(Vector3::BACK * moveSpeed * timeDelta);
     if (input->GetKeyDown('A'))
-        cameraNode_->Translate(Vector3::LEFT * MOVE_SPEED * timeDelta);
+        cameraNode_->Translate(Vector3::LEFT * moveSpeed * timeDelta);
     if (input->GetKeyDown('D'))
-        cameraNode_->Translate(Vector3::RIGHT * MOVE_SPEED * timeDelta);
+        cameraNode_->Translate(Vector3::RIGHT * moveSpeed * timeDelta);
     if (input->GetKeyPress(KEY_SPACE))
         drawDebug_ = !drawDebug_;
     if (input->GetKeyPress('I'))
@@ -527,6 +536,8 @@ void HelloWorld::MoveCamera(float timeDelta)
         effectRenderPath->ToggleEnabled("Blur");
     if (input->GetKeyPress(KEY_ESC))
         engine_->Exit();
+    if (input->GetMouseButtonPress(MOUSEB_LEFT))
+        SpawnObject();
 }
 
 void HelloWorld::ToggleLight()
@@ -538,6 +549,28 @@ void HelloWorld::ToggleLight()
         Light* light = cameraNode_->GetComponent<Light>();
         light->SetEnabled(!light->IsEnabled());
     }
+}
+
+void HelloWorld::SpawnObject()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    Node* boxNode = scene_->CreateChild("SmallBox");
+    boxNode->SetPosition(cameraNode_->GetPosition());
+    boxNode->SetRotation(cameraNode_->GetRotation());
+    boxNode->SetScale(0.5f);
+    StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
+    boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    boxObject->SetMaterial(cache->GetResource<Material>("Materials/StoneEnvMapSmall.xml"));
+
+    RigidBody* body = boxNode->CreateComponent<RigidBody>();
+    CollisionShape* shape = boxNode->CreateComponent<CollisionShape>();
+    body->SetMass(40.0f);
+    body->SetFriction(0.05f);
+    shape->SetBox(Vector3::ONE);
+
+    const float BOX_VELOCITY = 160.0f;
+    body->SetLinearVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * BOX_VELOCITY);
 }
 
 void HelloWorld::AnimateScene(float timeDelta)

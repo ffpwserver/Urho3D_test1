@@ -63,6 +63,7 @@ private:
     void MoveCamera(float timeDelta);
     void AnimateScene(float timeDelta);
     void ToggleLight();
+    void SpawnObject();
     void HandleUpdate(StringHash eventType, VariantMap& eventData);
     void HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData);
 

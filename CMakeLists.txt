@@ -18,6 +18,8 @@ endif ()
 project (myUrho3DProj)
 # Set CMake modules search path
 set (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMake/Modules)
+#
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
 # Include Urho3D Cmake common module
 include (Urho3D-CMake-common)
 # Define target name
