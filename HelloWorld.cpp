@@ -105,9 +105,9 @@ void HelloWorld::Start()
 
     CreateFloor();
 
-    CreateFloor2();
+    // CreateFloor2();
 
-    CreatePyramid();
+    // CreatePyramid();
 
     CreateStaticModel();
 
@@ -308,7 +308,7 @@ void HelloWorld::CreateCamera()
     cameraNode_ = new Node(context_);
     cameraNode_->SetPosition(Vector3(0.0f, 5.0f, -20.0f));
     Camera* camera = cameraNode_->CreateComponent<Camera>();
-    camera->SetFarClip(1000.0f);
+    camera->SetFarClip(300.0f);
 
     rearCameraNode_ = cameraNode_->CreateChild("RearCamera");
     rearCameraNode_->SetRotation(Quaternion(180.0f, Vector3::UP));
@@ -318,14 +318,17 @@ void HelloWorld::CreateCamera()
     
 
     // try to create a spot light to camera node
-    Light* light = cameraNode_->CreateComponent<Light>();
+    Node* lightNode = cameraNode_->CreateChild("Light");
+    lightNode->SetPosition(Vector3(0.0f, 0.0f, 0.0f));
+    lightNode->SetDirection(Vector3(0.0f, 0.0f, 1.0f));
+    Light* light = lightNode->CreateComponent<Light>();
 
     light->SetLightType(LIGHT_SPOT);
-    light->SetRange(200.0f);
+    light->SetRange(300.0f);
     light->SetRampTexture(cache->GetResource<Texture2D>("Textures/RampExtreme.png"));
     light->SetFov(20.0f);
-    light->SetColor(Color(1.0f, 1.0f, 1.0f));
-    light->SetSpecularIntensity(2.0f);
+    light->SetColor(Color(0.0f, 1.0f, 0.0f));
+    light->SetSpecularIntensity(1.0f);
     light->SetCastShadows(true);
     light->SetShadowBias(BiasParameters(0.000025f, 0.5f));
 
@@ -333,6 +336,7 @@ void HelloWorld::CreateCamera()
     light->SetShadowDistance(125.0f);
     light->SetShadowResolution(0.5f);
     light->SetShadowNearFarRatio(0.01f);
+    light->SetEnabled(true);
 }
 
 void HelloWorld::CreateBillboards()
@@ -481,6 +485,7 @@ void HelloWorld::HandleUpdate(StringHash eventType, VariantMap& eventData)
 void HelloWorld::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
 {
     if (drawDebug_)
+        // GetSubsystem<Renderer>()->DrawDebugGeometry(true);
         scene_->GetComponent<PhysicsWorld>()->DrawDebugGeometry(true);
 }
 
@@ -534,10 +539,11 @@ void HelloWorld::MoveCamera(float timeDelta)
         effectRenderPath->ToggleEnabled("FXAA2");
     if (input->GetKeyPress('P'))
         effectRenderPath->ToggleEnabled("Blur");
+    // if (input->GetMouseButtonPress(MOUSEB_LEFT))
+    //     SpawnObject();
     if (input->GetKeyPress(KEY_ESC))
         engine_->Exit();
-    if (input->GetMouseButtonPress(MOUSEB_LEFT))
-        SpawnObject();
+
 }
 
 void HelloWorld::ToggleLight()
@@ -546,7 +552,7 @@ void HelloWorld::ToggleLight()
 
     if (input->GetMouseButtonPress(MOUSEB_RIGHT))
     {
-        Light* light = cameraNode_->GetComponent<Light>();
+        Light* light = cameraNode_->GetChild("Light")->GetComponent<Light>();
         light->SetEnabled(!light->IsEnabled());
     }
 }
