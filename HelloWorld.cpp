@@ -51,6 +51,7 @@
 #include <Urho3D/Graphics/BillboardSet.h>
 #include <Urho3D/Graphics/Technique.h>
 #include <Urho3D/Graphics/Texture2D.h>
+#include <Urho3D/Graphics/AnimatedModel.h>
 // #include <Urho3D/Scene/SceneEvents.h>
 // #include <Urho3D/UI/Sprite.h>
 // #include <Urho3D/Core/Timer.h>
@@ -65,6 +66,7 @@
 
 #include "HelloWorld.h"
 #include "Rotator.h"
+#include "RagdollComponent.h"
 
 // Expands to this example's entry-point
 URHO3D_DEFINE_APPLICATION_MAIN(HelloWorld)
@@ -77,6 +79,7 @@ HelloWorld::HelloWorld(Context* context)
 , drawDebug_(false)
 {
     context->RegisterFactory<Rotator>();
+    context->RegisterFactory<RagdollComponent>();
 }
 
 void HelloWorld::Setup()
@@ -105,9 +108,11 @@ void HelloWorld::Start()
 
     CreateFloor();
 
-    // CreateFloor2();
+    CreateFloor2();
 
-    // CreatePyramid();
+    CreatePyramid();
+
+    CreateRagdolls();
 
     CreateStaticModel();
 
@@ -236,7 +241,7 @@ void HelloWorld::CreateFloor()
         {
             Node* floorNode = scene_->CreateChild("FloorTile");
             floorNode->SetPosition(Vector3(j * 10.2f, -0.5f, i * 10.2f));
-            floorNode->SetScale(Vector3(10.f, 1.f, 10.f));
+            floorNode->SetScale(Vector3(10.f, 1.0f, 10.0f));
             StaticModel* floorObj = floorNode->CreateComponent<StaticModel>();
             floorObj->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
             floorObj->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
@@ -256,6 +261,7 @@ void HelloWorld::CreateFloor2()
     floorObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
 
     RigidBody* body = floorNode->CreateComponent<RigidBody>();
+    body->SetRollingFriction(0.15f);
     CollisionShape* shape = floorNode->CreateComponent<CollisionShape>();
     shape->SetBox(Vector3::ONE);
 }
@@ -285,12 +291,38 @@ void HelloWorld::CreatePyramid()
     }
 }
 
+void HelloWorld::CreateRagdolls()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    for (int z = -1; z <= 1; ++z)
+    {
+        for (int x = -4; x <= 4; ++x)
+        {
+            Node* modelNode = scene_->CreateChild("Jack");
+            modelNode->SetPosition(Vector3(x * 5.0f, 40.5f, z * 5.0f + 10.0f));
+            modelNode->SetRotation(Quaternion(0.0f, 180.0f, 0.0f));
+            AnimatedModel* modelObject = modelNode->CreateComponent<AnimatedModel>();
+            modelObject->SetModel(cache->GetResource<Model>("Models/Jack.mdl"));
+            modelObject->SetMaterial(cache->GetResource<Material>("Materials/Jack.xml"));
+            modelObject->SetCastShadows(true);
+            modelObject->SetUpdateInvisible(true);
+
+            RigidBody* body = modelNode->CreateComponent<RigidBody>();
+            body->SetTrigger(true);
+            CollisionShape* shape = modelNode->CreateComponent<CollisionShape>();
+            shape->SetCapsule(0.7f, 2.0f, Vector3(0.0f, 1.0f, 0.0f));
+            modelNode->CreateComponent<RagdollComponent>();
+        }
+    }
+}
+
 void HelloWorld::CreateStaticModel()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
     Node* mushroomNode = scene_->CreateChild("Mushroom");
-    mushroomNode->SetPosition(Vector3(20.f, 0.f, 20.f));
+    mushroomNode->SetPosition(Vector3(20.f, 0.0f, 20.f));
     mushroomNode->SetScale(8.f);
 
     StaticModel* mushroomObj = mushroomNode->CreateComponent<StaticModel>();
@@ -308,7 +340,7 @@ void HelloWorld::CreateCamera()
     cameraNode_ = new Node(context_);
     cameraNode_->SetPosition(Vector3(0.0f, 5.0f, -20.0f));
     Camera* camera = cameraNode_->CreateComponent<Camera>();
-    camera->SetFarClip(300.0f);
+    camera->SetFarClip(1200.0f);
 
     rearCameraNode_ = cameraNode_->CreateChild("RearCamera");
     rearCameraNode_->SetRotation(Quaternion(180.0f, Vector3::UP));
@@ -318,16 +350,17 @@ void HelloWorld::CreateCamera()
     
 
     // try to create a spot light to camera node
-    Node* lightNode = cameraNode_->CreateChild("Light");
-    lightNode->SetPosition(Vector3(0.0f, 0.0f, 0.0f));
-    lightNode->SetDirection(Vector3(0.0f, 0.0f, 1.0f));
+    Node* lightNode = scene_->CreateChild("CameraLight");
+    lightNode->SetPosition(cameraNode_->GetPosition());
+    lightNode->SetDirection(cameraNode_->GetDirection());
     Light* light = lightNode->CreateComponent<Light>();
+    light->SetEnabled(false);
 
     light->SetLightType(LIGHT_SPOT);
     light->SetRange(300.0f);
     light->SetRampTexture(cache->GetResource<Texture2D>("Textures/RampExtreme.png"));
     light->SetFov(20.0f);
-    light->SetColor(Color(0.0f, 1.0f, 0.0f));
+    light->SetColor(Color(1.0f, 1.0f, 1.0f));
     light->SetSpecularIntensity(1.0f);
     light->SetCastShadows(true);
     light->SetShadowBias(BiasParameters(0.000025f, 0.5f));
@@ -485,8 +518,10 @@ void HelloWorld::HandleUpdate(StringHash eventType, VariantMap& eventData)
 void HelloWorld::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
 {
     if (drawDebug_)
+    {
         // GetSubsystem<Renderer>()->DrawDebugGeometry(true);
         scene_->GetComponent<PhysicsWorld>()->DrawDebugGeometry(true);
+    }
 }
 
 void HelloWorld::MoveCamera(float timeDelta)
@@ -517,20 +552,23 @@ void HelloWorld::MoveCamera(float timeDelta)
     roll_ = Clamp(roll_, -20.0f, 20.0f);
 
     cameraNode_->SetRotation(Quaternion(pitch_, yaw_, roll_));
+    scene_->GetChild("CameraLight")->SetRotation(Quaternion(pitch_, yaw_, roll_));
 
     float moveSpeed;
     if (input->GetKeyDown(KEY_SHIFT))
         moveSpeed = MOVE_SPEED * 10.0f;
     else
         moveSpeed = MOVE_SPEED;
+    Vector3 cameraTranslateVector;
+
     if (input->GetKeyDown('W'))
-        cameraNode_->Translate(Vector3::FORWARD * moveSpeed * timeDelta);
+        cameraTranslateVector = Vector3::FORWARD * moveSpeed * timeDelta;
     if (input->GetKeyDown('S'))
-        cameraNode_->Translate(Vector3::BACK * moveSpeed * timeDelta);
+        cameraTranslateVector = Vector3::BACK * moveSpeed * timeDelta;
     if (input->GetKeyDown('A'))
-        cameraNode_->Translate(Vector3::LEFT * moveSpeed * timeDelta);
+        cameraTranslateVector = Vector3::LEFT * moveSpeed * timeDelta;
     if (input->GetKeyDown('D'))
-        cameraNode_->Translate(Vector3::RIGHT * moveSpeed * timeDelta);
+        cameraTranslateVector = Vector3::RIGHT * moveSpeed * timeDelta;
     if (input->GetKeyPress(KEY_SPACE))
         drawDebug_ = !drawDebug_;
     if (input->GetKeyPress('I'))
@@ -539,11 +577,13 @@ void HelloWorld::MoveCamera(float timeDelta)
         effectRenderPath->ToggleEnabled("FXAA2");
     if (input->GetKeyPress('P'))
         effectRenderPath->ToggleEnabled("Blur");
-    // if (input->GetMouseButtonPress(MOUSEB_LEFT))
-    //     SpawnObject();
+    if (input->GetMouseButtonPress(MOUSEB_LEFT))
+        SpawnObject();
     if (input->GetKeyPress(KEY_ESC))
         engine_->Exit();
-
+    // because the cameraNode is out of the scene, we need to set the light inside the scene and keep update with cameraNode
+    cameraNode_->Translate(cameraTranslateVector);
+    scene_->GetChild("CameraLight")->Translate(cameraTranslateVector);
 }
 
 void HelloWorld::ToggleLight()
@@ -552,7 +592,7 @@ void HelloWorld::ToggleLight()
 
     if (input->GetMouseButtonPress(MOUSEB_RIGHT))
     {
-        Light* light = cameraNode_->GetChild("Light")->GetComponent<Light>();
+        Light* light = scene_->GetChild("CameraLight")->GetComponent<Light>();
         light->SetEnabled(!light->IsEnabled());
     }
 }
@@ -561,22 +601,23 @@ void HelloWorld::SpawnObject()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    Node* boxNode = scene_->CreateChild("SmallBox");
+    Node* boxNode = scene_->CreateChild("Sphere");
     boxNode->SetPosition(cameraNode_->GetPosition());
     boxNode->SetRotation(cameraNode_->GetRotation());
-    boxNode->SetScale(0.5f);
+    boxNode->SetScale(0.25f);
     StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
-    boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-    boxObject->SetMaterial(cache->GetResource<Material>("Materials/StoneEnvMapSmall.xml"));
+    boxObject->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
+    boxObject->SetMaterial(cache->GetResource<Material>("Materials/StoneSmall.xml"));
+    boxObject->SetCastShadows(true);
 
     RigidBody* body = boxNode->CreateComponent<RigidBody>();
+    body->SetMass(1.0f);
+    body->SetRollingFriction(0.15f);
     CollisionShape* shape = boxNode->CreateComponent<CollisionShape>();
-    body->SetMass(40.0f);
-    body->SetFriction(0.05f);
-    shape->SetBox(Vector3::ONE);
+    shape->SetSphere(1.0f);
 
-    const float BOX_VELOCITY = 160.0f;
-    body->SetLinearVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * BOX_VELOCITY);
+    const float OBJECT_VELOCITY = 10.0f;
+    body->SetLinearVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * OBJECT_VELOCITY);
 }
 
 void HelloWorld::AnimateScene(float timeDelta)

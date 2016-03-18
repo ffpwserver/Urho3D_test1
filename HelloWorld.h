@@ -54,6 +54,7 @@ private:
     void CreateFloor();
     void CreateFloor2();
     void CreatePyramid();
+    void CreateRagdolls();
     void CreateStaticModel();
     void CreateCamera();
     void CreateBillboards();
